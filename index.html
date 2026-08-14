@@ -3,91 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>家族の検討リスト</title>
+    <title>検討リスト</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 min-h-screen pb-10">
-
-    <div class="max-w-md mx-auto p-4">
-        <header class="text-center mb-6 mt-4">
-            <h1 class="text-2xl font-extrabold text-gray-800">🏡 家族の検討リスト</h1>
-        </header>
-
-        <!-- 入力エリア -->
-        <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mb-6">
-            <!-- ①プロジェクト設定 -->
-            <label class="block text-xs font-bold text-gray-400 uppercase mb-1">1. プロジェクト名</label>
-            <select id="projectSelect" onchange="updateCategoryDropdown()" class="w-full p-3 bg-gray-50 rounded-xl mb-3 font-bold"></select>
-            <input type="text" id="newProjectInput" placeholder="新しいプロジェクト名を入力" class="hidden w-full p-3 bg-indigo-50 rounded-xl mb-3 text-indigo-800">
-
-            <!-- ②カテゴリ（製品）設定 -->
-            <label class="block text-xs font-bold text-gray-400 uppercase mb-1 mt-2">2. 製品・項目名</label>
-            <select id="categorySelect" class="w-full p-3 bg-gray-50 rounded-xl mb-3 font-bold"></select>
-            <input type="text" id="newCategoryInput" placeholder="新しい製品カテゴリを入力" class="hidden w-full p-3 bg-indigo-50 rounded-xl mb-3 text-indigo-800">
-
-            <div class="border-t pt-4">
-                <input type="url" id="url" placeholder="URL" class="w-full p-3 bg-gray-50 rounded-xl mb-2 text-sm">
-                <textarea id="comment" placeholder="コメント・メモ" class="w-full p-3 bg-gray-50 rounded-xl mb-3 text-sm h-20"></textarea>
-                <button id="addBtn" onclick="addItem()" class="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold">追加する</button>
-            </div>
+    <div class="max-w-md mx-auto p-4" id="app">
+        <!-- 画面の切り替え用 -->
+        <div id="screen-project">
+            <h1 class="text-xl font-bold text-gray-800 mb-6 mt-4 text-center">プロジェクトを選択</h1>
+            <div id="project-grid" class="grid grid-cols-2 gap-4"></div>
+            <button onclick="showCreateProject()" class="mt-6 w-full p-4 bg-indigo-600 text-white rounded-2xl font-bold">＋ 新規プロジェクト作成</button>
         </div>
 
-        <div id="items-list" class="space-y-4"></div>
+        <div id="screen-items" class="hidden">
+            <button onclick="goBack()" class="mb-4 text-sm text-gray-500 font-bold">← プロジェクト一覧へ戻る</button>
+            <h2 id="current-project-title" class="text-2xl font-bold mb-4"></h2>
+            
+            <!-- アイテム追加フォーム -->
+            <div class="bg-white p-4 rounded-2xl shadow-sm mb-6">
+                <input type="text" id="new-category" placeholder="製品カテゴリ名" class="w-full p-3 bg-gray-50 rounded-xl mb-2">
+                <input type="url" id="new-url" placeholder="URL" class="w-full p-3 bg-gray-50 rounded-xl mb-2">
+                <textarea id="new-comment" placeholder="コメント" class="w-full p-3 bg-gray-50 rounded-xl mb-2 h-20"></textarea>
+                <button onclick="addItem()" class="w-full bg-indigo-600 text-white p-3 rounded-xl font-bold">追加</button>
+            </div>
+            <div id="items-list" class="space-y-3"></div>
+        </div>
     </div>
 
+    <!-- 新規作成モーダルなど省略 -->
     <script>
         const API_BASE_URL = "https://application-for-family-discussion.onrender.com/api";
+        const ICONS = ["🏠","🧸","📦","🍽️","💡","🛋️","📚","🎨","🚗","👔","💻","👗","🌱","🍳","🛁","🖼️","🎁","⌚","👟","🏖️","🎉","🚲","🎧","🎒","🧘","🍳","🛏️","🕯️","🧼","🚿","🍽️","🧩","🧴","🔧","🪜","🧺","🛌","🍽️","🍴","🍯","☕","🍵","🍎","🍇","🍓","🌽","🥕","🍞","🥐","🍱","🍣","🍜","🍕","🍔","🍦","🍩","🍰"];
         let allData = [];
+        let currentProject = "";
 
-        window.onload = async () => {
-            try {
-                const res = await fetch(`${API_BASE_URL}/items`);
-                allData = await res.json();
-                renderUI();
-            } catch(e) { document.body.innerHTML = "サーバーエラー: 数分待ってリロードしてください。"; }
-        };
+        async function loadData() {
+            const res = await fetch(`${API_BASE_URL}/items`);
+            allData = await res.json();
+            renderProjects();
+        }
 
-        function renderUI() {
+        function renderProjects() {
+            const projectGrid = document.getElementById('project-grid');
             const projects = [...new Set(allData.map(d => d.project_name))];
-            const pSelect = document.getElementById('projectSelect');
-            pSelect.innerHTML = `<option value="__new__">＋ 新規プロジェクト</option>` + projects.map(p => `<option value="${p}">${p}</option>`).join('');
-            updateCategoryDropdown();
-        }
-
-        function updateCategoryDropdown() {
-            const pVal = document.getElementById('projectSelect').value;
-            const newP = document.getElementById('newProjectInput');
-            newP.classList.toggle('hidden', pVal !== '__new__');
             
-            const filtered = allData.filter(d => d.project_name === pVal);
-            const cats = [...new Set(filtered.map(d => d.category))];
-            const cSelect = document.getElementById('categorySelect');
-            cSelect.innerHTML = `<option value="__new__">＋ 新しい製品カテゴリ</option>` + cats.map(c => `<option value="${c}">${c}</option>`).join('');
-            updateCategoryInputs();
+            projectGrid.innerHTML = projects.map(p => {
+                const icon = allData.find(d => d.project_name === p).icon;
+                return `<div onclick="selectProject('${p}')" class="bg-white p-6 rounded-3xl shadow-sm border text-center cursor-pointer hover:border-indigo-400">
+                    <div class="text-4xl mb-2">${icon}</div>
+                    <div class="font-bold text-sm">${p}</div>
+                </div>`;
+            }).join('');
         }
 
-        function updateCategoryInputs() {
-            const cVal = document.getElementById('categorySelect').value;
-            document.getElementById('newCategoryInput').classList.toggle('hidden', cVal !== '__new__');
+        function selectProject(p) {
+            currentProject = p;
+            document.getElementById('screen-project').classList.add('hidden');
+            document.getElementById('screen-items').classList.remove('hidden');
+            document.getElementById('current-project-title').innerText = p;
+            renderItems();
         }
 
-        document.getElementById('categorySelect').onchange = updateCategoryInputs;
+        function goBack() {
+            document.getElementById('screen-project').classList.remove('hidden');
+            document.getElementById('screen-items').classList.add('hidden');
+            loadData();
+        }
+
+        function renderItems() {
+            const list = document.getElementById('items-list');
+            const items = allData.filter(d => d.project_name === currentProject);
+            list.innerHTML = items.map(item => `
+                <div class="bg-white p-4 rounded-2xl flex gap-3 items-center shadow-sm">
+                    <img src="${item.image_url || ''}" class="w-16 h-16 rounded-lg bg-gray-100 object-cover">
+                    <div class="flex-grow">
+                        <div class="text-[10px] font-bold text-indigo-500">${item.category}</div>
+                        <div class="font-bold text-sm line-clamp-1">${item.title}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
 
         async function addItem() {
-            const pName = document.getElementById('projectSelect').value === '__new__' ? document.getElementById('newProjectInput').value : document.getElementById('projectSelect').value;
-            const cat = document.getElementById('categorySelect').value === '__new__' ? document.getElementById('newCategoryInput').value : document.getElementById('categorySelect').value;
-            const url = document.getElementById('url').value;
-            const comment = document.getElementById('comment').value;
-
-            if(!pName || !cat || !url) return alert("全て入力してください");
+            const cat = document.getElementById('new-category').value;
+            const url = document.getElementById('new-url').value;
+            const comment = document.getElementById('new-comment').value;
+            const icon = ICONS[Math.floor(Math.random() * ICONS.length)]; // 簡単のためランダムアイコン
 
             await fetch(`${API_BASE_URL}/items`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ project_name: pName, category: cat, url, comment })
+                body: JSON.stringify({ project_name: currentProject, category: cat, url, comment, icon })
             });
-            location.reload(); // シンプルにリロードで反映
+            await loadData();
+            selectProject(currentProject);
         }
+
+        window.onload = loadData;
     </script>
 </body>
 </html>
