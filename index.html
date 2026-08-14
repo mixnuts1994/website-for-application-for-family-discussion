@@ -20,11 +20,34 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen text-gray-800 pb-20">
+<body class="bg-gray-100 min-h-screen text-gray-800 pb-20 relative">
     
+    <!-- ローディング -->
     <div id="loader">
         <div class="spinner mb-4"></div>
         <p class="font-bold text-gray-600" id="loader-text">読み込み中...</p>
+    </div>
+
+    <!-- アイテム編集用モーダル -->
+    <div id="modal-edit-item" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <h3 class="font-bold mb-4 text-lg">アイテムの編集</h3>
+            <input type="hidden" id="edit-item-id">
+            
+            <label class="text-xs font-bold text-gray-500 block mb-1">製品名</label>
+            <input type="text" id="edit-item-title" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl mb-3">
+            
+            <label class="text-xs font-bold text-gray-500 block mb-1">金額</label>
+            <input type="number" id="edit-item-price" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl mb-3">
+            
+            <label class="text-xs font-bold text-gray-500 block mb-1">URL</label>
+            <input type="url" id="edit-item-url" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl mb-6">
+            
+            <div class="flex gap-3">
+                <button onclick="closeEditModal()" class="flex-1 bg-gray-200 text-gray-700 p-3 rounded-xl font-bold">キャンセル</button>
+                <button onclick="saveEditItem()" class="flex-1 bg-indigo-600 text-white p-3 rounded-xl font-bold shadow">保存する</button>
+            </div>
+        </div>
     </div>
 
     <div class="max-w-md mx-auto p-4" id="app">
@@ -71,8 +94,14 @@
             
             <div class="flex justify-between items-end mb-6 bg-white p-4 rounded-2xl shadow-sm border border-gray-200">
                 <div>
-                    <span id="current-project-icon" class="text-2xl mr-2"></span>
-                    <h2 id="current-project-title" class="text-xl font-bold inline"></h2>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span id="current-project-icon" class="text-2xl"></span>
+                        <h2 id="current-project-title" class="text-xl font-bold"></h2>
+                    </div>
+                    <div class="flex gap-3 text-sm">
+                        <button onclick="editProjectName()" class="text-gray-500 hover:text-indigo-600">✏️ 名前変更</button>
+                        <button onclick="deleteProjectData()" class="text-gray-500 hover:text-red-600">🗑️ 削除</button>
+                    </div>
                 </div>
                 <div class="text-right">
                     <div class="text-xs text-gray-500">決定済み合計金額</div>
@@ -234,6 +263,44 @@
             document.getElementById('screen-projects').classList.remove('hidden');
         }
 
+        // --- プロジェクト編集・削除機能 ---
+        async function editProjectName() {
+            const newName = prompt("新しいプロジェクト名を入力してください", currentProject);
+            if (!newName || newName === currentProject) return;
+            
+            showLoader(true, "プロジェクト名を変更中...");
+            const projectItems = allData.filter(d => d.project_name === currentProject);
+            
+            // 全アイテムのプロジェクト名を一括更新
+            await Promise.all(projectItems.map(item => 
+                fetch(`${API_BASE_URL}/items/${item.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ project_name: newName })
+                })
+            ));
+            
+            currentProject = newName;
+            document.getElementById('current-project-title').innerText = newName;
+            await loadData();
+        }
+
+        async function deleteProjectData() {
+            if (!confirm(`プロジェクト「${currentProject}」を削除しますか？\n※登録されているアイテムもすべて削除されます。`)) return;
+            
+            showLoader(true, "プロジェクトを削除中...");
+            const projectItems = allData.filter(d => d.project_name === currentProject);
+            
+            // 全アイテムを一括削除
+            await Promise.all(projectItems.map(item => 
+                fetch(`${API_BASE_URL}/items/${item.id}`, { method: "DELETE" })
+            ));
+            
+            goBackToProjects();
+            await loadData();
+        }
+
+
         // --- 製品リスト画面 ---
         function renderItems() {
             const listContainer = document.getElementById('category-list');
@@ -277,7 +344,14 @@
             const titleLink = item.url ? `<a href="${item.url}" target="_blank" class="text-indigo-600 hover:underline line-clamp-2">${item.title}</a>` : `<span class="line-clamp-2">${item.title}</span>`;
             
             return `
-                <div class="p-3 bg-white rounded-xl flex gap-3 items-start border ${item.is_decided ? 'border-indigo-400 bg-indigo-50' : 'border-gray-100'}">
+                <div class="relative p-3 pt-8 bg-white rounded-xl flex gap-3 items-start border ${item.is_decided ? 'border-indigo-400 bg-indigo-50' : 'border-gray-100'}">
+                    
+                    <!-- 編集・削除ボタン -->
+                    <div class="absolute top-2 right-2 flex gap-3">
+                        <button onclick="openEditModal(${item.id})" class="text-gray-400 hover:text-indigo-600 text-xs font-bold">✏️編集</button>
+                        <button onclick="deleteItemRow(${item.id})" class="text-gray-400 hover:text-red-600 text-xs font-bold">🗑️削除</button>
+                    </div>
+
                     <div class="mt-1">
                         <input type="checkbox" class="w-5 h-5 accent-indigo-600" ${item.is_decided ? 'checked' : ''} onchange="updateItem(${item.id}, {is_decided: this.checked})">
                     </div>
@@ -317,6 +391,38 @@
             const newRatings = { ...(item.user_ratings || {}) };
             newRatings[currentUser] = val;
             await updateItem(id, { user_ratings: newRatings });
+        }
+
+        // --- アイテム編集・削除機能 ---
+        function openEditModal(id) {
+            const item = allData.find(d => d.id === id);
+            document.getElementById('edit-item-id').value = item.id;
+            document.getElementById('edit-item-title').value = item.title || "";
+            document.getElementById('edit-item-price').value = item.price || 0;
+            document.getElementById('edit-item-url').value = item.url || "";
+            document.getElementById('modal-edit-item').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('modal-edit-item').classList.add('hidden');
+        }
+
+        async function saveEditItem() {
+            const id = document.getElementById('edit-item-id').value;
+            const title = document.getElementById('edit-item-title').value;
+            const price = parseInt(document.getElementById('edit-item-price').value) || 0;
+            const url = document.getElementById('edit-item-url').value;
+            
+            closeEditModal();
+            showLoader(true, "更新中...");
+            await updateItem(id, { title, price, url });
+        }
+
+        async function deleteItemRow(id) {
+            if (!confirm("このアイテムを削除してもよろしいですか？")) return;
+            showLoader(true, "削除中...");
+            await fetch(`${API_BASE_URL}/items/${id}`, { method: "DELETE" });
+            loadData();
         }
 
         // 画像プレビュー圧縮処理
