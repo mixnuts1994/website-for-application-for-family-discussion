@@ -5,120 +5,150 @@
     <title>検討リスト</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.8); z-index: 50; justify-content: center; align-items: center; }
+        .loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); display: none; z-index: 100; justify-content: center; align-items: center; font-size: 2rem; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <!-- ローディングアニメーション -->
-    <div id="loader" class="loading-overlay"><div class="animate-spin text-4xl">⏳</div></div>
-
+<body class="bg-gray-100 min-h-screen pb-20">
+    <div id="loader" class="loader">⏳ 処理中...</div>
     <div class="max-w-md mx-auto p-4" id="app">
-        <!-- ログイン画面 -->
-        <div id="screen-login">
-            <h1 class="text-2xl font-bold text-center mt-10 mb-6">あなたのお名前は？</h1>
-            <input type="text" id="username-input" class="w-full p-4 rounded-xl border mb-4" placeholder="例：宏紀">
-            <button onclick="login()" class="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold">スタート</button>
+        <!-- ログイン -->
+        <div id="screen-login" class="bg-white p-6 rounded-3xl shadow-lg mt-10">
+            <h1 class="text-xl font-bold mb-4">あなたのお名前は？</h1>
+            <input type="text" id="username" class="w-full p-3 border rounded-xl mb-4">
+            <button onclick="login()" class="w-full bg-indigo-600 text-white p-3 rounded-xl">はじめる</button>
         </div>
 
-        <!-- メイン画面 -->
+        <!-- メイン -->
         <div id="screen-main" class="hidden">
-            <div class="flex justify-between items-center mb-4">
-                <span id="user-display" class="font-bold text-gray-700"></span>
-                <button onclick="logout()" class="text-xs text-gray-400">切り替え</button>
-            </div>
+            <div id="project-container" class="space-y-6"></div>
             
-            <div id="project-list" class="space-y-4"></div>
-            
-            <!-- 新規追加エリア -->
-            <div class="mt-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                <h3 class="font-bold mb-4">新規追加</h3>
+            <!-- 新規追加 -->
+            <div class="mt-10 bg-white p-6 rounded-3xl border border-gray-200">
+                <h2 class="font-bold mb-4">＋ 製品を追加</h2>
                 <input type="text" id="add-proj" placeholder="プロジェクト名" class="w-full p-2 border rounded mb-2">
                 <input type="text" id="add-cat" placeholder="カテゴリ" class="w-full p-2 border rounded mb-2">
                 <input type="text" id="add-url" placeholder="URL" class="w-full p-2 border rounded mb-2">
-                <input type="number" id="add-price" placeholder="金額" class="w-full p-2 border rounded mb-2">
-                <button onclick="addItem()" class="w-full bg-indigo-600 text-white p-3 rounded-xl font-bold">登録</button>
+                <button onclick="autoExtract()" class="text-xs text-indigo-600 mb-2">URLから自動取得</button>
+                <input type="number" id="add-price" placeholder="価格 (任意)" class="w-full p-2 border rounded mb-2">
+                <input type="file" id="camera" accept="image/*" capture="environment" class="hidden" onchange="processImage(this)">
+                <button onclick="document.getElementById('camera').click()" class="w-full bg-gray-200 p-2 rounded mb-4">📷 カメラで撮影</button>
+                <button onclick="saveItem()" class="w-full bg-indigo-600 text-white p-3 rounded-xl">登録</button>
             </div>
         </div>
     </div>
 
     <script>
-        const API_URL = "https://application-for-family-discussion.onrender.com/api";
-        let currentUser = localStorage.getItem("username");
-        let allData = [];
+        const API = "https://application-for-family-discussion.onrender.com";
+        let user = localStorage.getItem("user");
+        let imageData = null;
 
-        function showLoader(show) { document.getElementById('loader').style.display = show ? 'flex' : 'none'; }
+        function showLoader(s) { document.getElementById('loader').style.display = s ? 'flex' : 'none'; }
 
         function login() {
-            const name = document.getElementById('username-input').value;
-            if(!name) return;
-            localStorage.setItem("username", name);
-            currentUser = name;
+            user = document.getElementById('username').value;
+            localStorage.setItem("user", user);
             document.getElementById('screen-login').classList.add('hidden');
             document.getElementById('screen-main').classList.remove('hidden');
-            loadData();
+            loadItems();
         }
 
-        async function loadData() {
+        async function loadItems() {
             showLoader(true);
-            const res = await fetch(`${API_URL}/items`);
-            allData = await res.json();
-            render();
+            const res = await fetch(`${API}/api/items`);
+            const data = await res.json();
+            render(data);
             showLoader(false);
         }
 
-        function render() {
-            const container = document.getElementById('project-list');
-            document.getElementById('user-display').innerText = `ログイン中: ${currentUser}`;
-            
-            const projects = [...new Set(allData.map(i => i.project_name))];
+        function render(items) {
+            const container = document.getElementById('project-container');
+            const projects = [...new Set(items.map(i => i.project_name))];
             container.innerHTML = projects.map(p => {
-                const items = allData.filter(i => i.project_name === p);
-                const total = items.filter(i => i.is_decided).reduce((sum, i) => sum + (i.price || 0), 0);
+                const projItems = items.filter(i => i.project_name === p);
+                const total = projItems.filter(i => i.is_decided).reduce((a, b) => a + (b.price || 0), 0);
                 return `
                     <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-200">
-                        <div class="flex justify-between font-bold text-lg">${p} <span>¥${total.toLocaleString()}</span></div>
-                        ${renderCategories(items)}
+                        <div class="font-bold text-xl mb-2">${p} <span class="text-gray-400 text-sm">計: ¥${total.toLocaleString()}</span></div>
+                        ${renderCategories(projItems)}
                     </div>`;
             }).join('');
         }
 
         function renderCategories(items) {
             const cats = [...new Set(items.map(i => i.category))];
-            return cats.map(c => {
-                const catItems = items.filter(i => i.category === c);
-                return `
-                    <details class="mt-4 border-t pt-2" open>
-                        <summary class="font-bold text-indigo-700 cursor-pointer">${c}</summary>
-                        <div class="space-y-2 mt-2">${catItems.map(item => `
+            return cats.map(c => `
+                <details class="mt-2 border-t pt-2" open>
+                    <summary class="font-bold text-indigo-700 cursor-pointer">${c} <button onclick="recommend('${c}')" class="text-xs bg-gray-100 px-2 rounded">AI提案</button></summary>
+                    <div class="mt-2 space-y-2">
+                        ${items.filter(i => i.category === c).map(i => `
                             <div class="p-3 bg-gray-50 rounded-xl flex items-center gap-3">
-                                <input type="checkbox" ${item.is_decided ? 'checked' : ''} onchange="toggleDecided('${item.id}', this.checked)">
+                                <input type="checkbox" ${i.is_decided ? 'checked' : ''} onchange="toggleDecided(${i.id}, this.checked)">
+                                <img src="${i.image_data || ''}" class="w-12 h-12 rounded bg-white object-cover">
                                 <div class="flex-grow">
-                                    <a href="${item.url}" target="_blank" class="text-sm font-bold block">${item.title || 'リンク'}</a>
-                                    <div class="text-xs text-gray-500">¥${item.price.toLocaleString()}</div>
+                                    <a href="${i.url}" target="_blank" class="text-sm font-bold">${i.title}</a>
+                                    <div class="text-xs">¥${i.price.toLocaleString()}</div>
                                 </div>
-                                <div class="text-xl">Rating: ${item.user_ratings[currentUser] || 0}</div>
-                            </div>
-                        `).join('')}</div>
-                    </details>`;
-            }).join('');
+                                <select onchange="updateRating(${i.id}, this.value)" class="bg-transparent text-sm">
+                                    ${[0,1,2,3,4,5].map(n => `<option value="${n}" ${i.user_ratings[user] == n ? 'selected':''}>${n}★</option>`).join('')}
+                                </select>
+                            </div>`).join('')}
+                    </div>
+                </details>`).join('');
         }
 
-        async function addItem() {
+        async function processImage(input) {
+            const file = input.files[0];
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 300; canvas.height = (img.height/img.width)*300;
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    imageData = canvas.toDataURL('image/jpeg', 0.5);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function autoExtract() {
+            showLoader(true);
+            const url = document.getElementById('add-url').value;
+            const res = await fetch(`${API}/api/extract?url=${encodeURIComponent(url)}`, {method:'POST'});
+            const data = await res.json();
+            try {
+                const info = JSON.parse(data.result.replace(/```json|```/g, ''));
+                document.getElementById('add-price').value = info.price;
+                document.getElementById('add-proj').value = info.title || '';
+            } catch(e) { alert("抽出失敗"); }
+            showLoader(false);
+        }
+
+        async function saveItem() {
             showLoader(true);
             const payload = {
                 project_name: document.getElementById('add-proj').value,
                 category: document.getElementById('add-cat').value,
                 url: document.getElementById('add-url').value,
-                price: parseInt(document.getElementById('add-price').value),
-                user_ratings: {[currentUser]: 3}
+                price: parseInt(document.getElementById('add-price').value) || 0,
+                image_data: imageData,
+                user_ratings: {[user]: 0}
             };
-            await fetch(`${API_URL}/items`, { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-            await loadData();
-            showLoader(false);
+            await fetch(`${API}/api/items`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+            location.reload();
         }
 
-        window.onload = () => currentUser ? login() : null;
-        function logout() { localStorage.removeItem("username"); location.reload(); }
+        async function toggleDecided(id, val) {
+            await fetch(`${API}/api/items/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({is_decided: val})});
+            loadItems();
+        }
+
+        async function updateRating(id, val) {
+            // ※簡易実装：rating更新処理はここに追加してください
+        }
+
+        window.onload = () => user ? (document.getElementById('screen-login').classList.add('hidden'), document.getElementById('screen-main').classList.remove('hidden'), loadItems()) : null;
     </script>
 </body>
 </html>
