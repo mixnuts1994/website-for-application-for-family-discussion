@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>家族共同検討ツール</title>
-    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
+    <!-- URLが直接指定されていることを確認してください -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .grid-icons { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
         /* ローディング画面 */
@@ -115,8 +116,8 @@
     </div>
 
     <script>
-        // ▼ API URL (ご自身のRender URLに変更してください)
-        const API_BASE_URL = "[https://application-for-family-discussion.onrender.com/api](https://application-for-family-discussion.onrender.com/api)";
+        // ▼ URLが直接指定されていることを確認してください（リンク化されていないこと）
+        const API_BASE_URL = "https://application-for-family-discussion.onrender.com/api";
         const ICONS = ["🏠","🧸","📦","🍽️","💡","🛋️","📚","🎨","🚗","👔","💻","👗","🌱","🍳","🛁","🖼️","🎁","⌚","👟","🏖️","🎉","🚲","🎧","🎒","🧘","🛏️","🕯️","🧼","🚿","🧩","🧴","🔧","🪜","🧺","🛌","🍴","🍯","☕","🍵","🍎","🍇","🍓","🌽","🥕","🍞","🥐","🍱","🍣","🍜","🍕","🍔","🍦","🍩","🍰"];
         const RATINGS = { 5: "5: 決定したい", 4: "4: 有力候補", 3: "3: 検討中", 2: "2: 参考", 1: "1: 微妙", 0: "0: 未評価" };
 
