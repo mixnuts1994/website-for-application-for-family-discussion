@@ -4,11 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>家族共同検討ツール</title>
-    <!-- URLが直接指定されていることを確認してください -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .grid-icons { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
-        /* ローディング画面 */
         #loader {
             position: fixed; inset: 0; background: rgba(255,255,255,0.85);
             display: none; z-index: 100; flex-direction: column; justify-content: center; align-items: center;
@@ -22,7 +20,6 @@
 </head>
 <body class="bg-gray-100 min-h-screen text-gray-800 pb-20 relative">
     
-    <!-- ローディング -->
     <div id="loader">
         <div class="spinner mb-4"></div>
         <p class="font-bold text-gray-600" id="loader-text">読み込み中...</p>
@@ -52,9 +49,7 @@
 
     <div class="max-w-md mx-auto p-4" id="app">
         
-        <!-- ========================================== -->
         <!-- 画面1: 名前入力画面 -->
-        <!-- ========================================== -->
         <div id="screen-name" class="hidden mt-10">
             <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-200">
                 <h1 class="text-2xl font-bold mb-6 text-center">お名前を入力してください</h1>
@@ -63,9 +58,7 @@
             </div>
         </div>
 
-        <!-- ========================================== -->
         <!-- 画面2: プロジェクト選択・作成画面 -->
-        <!-- ========================================== -->
         <div id="screen-projects" class="hidden">
             <div class="flex justify-between items-center mb-6 mt-4">
                 <h1 class="text-xl font-bold">プロジェクト一覧</h1>
@@ -86,9 +79,7 @@
             </div>
         </div>
 
-        <!-- ========================================== -->
         <!-- 画面3: 製品・項目選択画面 -->
-        <!-- ========================================== -->
         <div id="screen-items" class="hidden">
             <button onclick="goBackToProjects()" class="mb-4 text-sm text-gray-500 font-bold">← プロジェクト一覧へ戻る</button>
             
@@ -121,15 +112,12 @@
                 <datalist id="category-datalist"></datalist>
 
                 <label class="text-xs font-bold text-gray-500">参考URL (任意)</label>
-                <div class="flex gap-2 mb-1">
-                    <input type="url" id="add-url" placeholder="https://..." class="flex-grow p-3 bg-gray-50 border border-gray-200 rounded-xl">
-                    <button onclick="autoExtract()" class="bg-indigo-100 text-indigo-700 px-3 rounded-xl font-bold text-xs whitespace-nowrap">AI自動入力</button>
-                </div>
+                <input type="url" id="add-url" placeholder="https://..." class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl mb-3">
                 
                 <div class="flex justify-between items-center mb-3">
-                    <span class="text-xs text-gray-400">または</span>
+                    <span class="text-xs text-gray-400">画像の追加</span>
                     <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden" onchange="handleImage(this)">
-                    <button onclick="document.getElementById('camera-input').click()" class="text-sm bg-gray-100 px-3 py-1 rounded-lg">📷 カメラで撮影</button>
+                    <button onclick="document.getElementById('camera-input').click()" class="text-sm bg-gray-100 px-3 py-1 rounded-lg">📷 カメラ・写真</button>
                 </div>
                 <div id="preview-area" class="mb-3 hidden"><img id="img-preview" class="h-20 rounded"></div>
 
@@ -145,12 +133,11 @@
     </div>
 
     <script>
-        // ▼ URLが直接指定されていることを確認してください（リンク化されていないこと）
         const API_BASE_URL = "https://application-for-family-discussion.onrender.com/api";
         const ICONS = ["🏠","🧸","📦","🍽️","💡","🛋️","📚","🎨","🚗","👔","💻","👗","🌱","🍳","🛁","🖼️","🎁","⌚","👟","🏖️","🎉","🚲","🎧","🎒","🧘","🛏️","🕯️","🧼","🚿","🧩","🧴","🔧","🪜","🧺","🛌","🍴","🍯","☕","🍵","🍎","🍇","🍓","🌽","🥕","🍞","🥐","🍱","🍣","🍜","🍕","🍔","🍦","🍩","🍰"];
         const RATINGS = { 5: "5: 決定したい", 4: "4: 有力候補", 3: "3: 検討中", 2: "2: 参考", 1: "1: 微妙", 0: "0: 未評価" };
 
-        let currentUser = "";
+        let currentUser = localStorage.getItem("username") || "";
         let currentProject = "";
         let currentProjIcon = "";
         let allData = [];
@@ -162,9 +149,7 @@
             document.getElementById('loader-text').innerText = text;
         }
 
-        // --- 初期化・ユーザー管理 ---
         window.onload = () => {
-            currentUser = localStorage.getItem("username");
             if (currentUser) {
                 document.getElementById('screen-projects').classList.remove('hidden');
                 loadData();
@@ -183,22 +168,16 @@
             loadData();
         }
 
-        function logout() {
-            localStorage.removeItem("username");
-            location.reload();
-        }
+        function logout() { localStorage.removeItem("username"); location.reload(); }
 
-        // --- データ取得・レンダリング ---
         async function loadData() {
             showLoader(true);
             try {
                 const res = await fetch(`${API_BASE_URL}/items`);
                 allData = await res.json();
                 renderProjects();
-                if(currentProject) renderItems(); // プロジェクト選択中なら再描画
-            } catch(e) {
-                console.error(e);
-            }
+                if(currentProject) renderItems();
+            } catch(e) { console.error(e); }
             showLoader(false);
         }
 
@@ -214,11 +193,9 @@
                 </div>`;
             }).join('');
 
-            // アイコンピッカー初期化
             const picker = document.getElementById('icon-picker');
             picker.innerHTML = ICONS.map(i => `<span onclick="pickIcon('${i}')" class="cursor-pointer text-2xl hover:bg-indigo-100 rounded p-1 text-center">${i}</span>`).join('');
             
-            // 未使用アイコンを自動提案
             const usedIcons = [...new Set(allData.map(d => d.icon))];
             const available = ICONS.filter(i => !usedIcons.includes(i));
             selectedIcon = available.length > 0 ? available[0] : ICONS[0];
@@ -226,20 +203,14 @@
         }
 
         function toggleIconPicker() { document.getElementById('icon-picker').classList.toggle('hidden'); }
-        function pickIcon(i) {
-            selectedIcon = i;
-            document.getElementById('selected-icon').innerText = i;
-            toggleIconPicker();
-        }
+        function pickIcon(i) { selectedIcon = i; document.getElementById('selected-icon').innerText = i; toggleIconPicker(); }
 
         async function createProject() {
             const name = document.getElementById('new-project-name').value;
             if(!name) return alert("プロジェクト名を入力してください");
-            
-            showLoader(true, "プロジェクト作成中...");
+            showLoader(true, "作成中...");
             await fetch(`${API_BASE_URL}/items`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
+                method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ project_name: name, category: "初期化", icon: selectedIcon })
             });
             document.getElementById('new-project-name').value = "";
@@ -248,8 +219,7 @@
         }
 
         function selectProject(name, icon) {
-            currentProject = name;
-            currentProjIcon = icon;
+            currentProject = name; currentProjIcon = icon;
             document.getElementById('screen-projects').classList.add('hidden');
             document.getElementById('screen-items').classList.remove('hidden');
             document.getElementById('current-project-title').innerText = name;
@@ -263,23 +233,18 @@
             document.getElementById('screen-projects').classList.remove('hidden');
         }
 
-        // --- プロジェクト編集・削除機能 ---
         async function editProjectName() {
             const newName = prompt("新しいプロジェクト名を入力してください", currentProject);
             if (!newName || newName === currentProject) return;
-            
-            showLoader(true, "プロジェクト名を変更中...");
+            showLoader(true, "変更中...");
             const projectItems = allData.filter(d => d.project_name === currentProject);
-            
-            // 全アイテムのプロジェクト名を一括更新
-            await Promise.all(projectItems.map(item => 
-                fetch(`${API_BASE_URL}/items/${item.id}`, {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
+            await Promise.all(projectItems.map(item => {
+                const itemId = item.id || item._id; // IDの形式揺れを吸収
+                return fetch(`${API_BASE_URL}/items/${itemId}`, {
+                    method: "PUT", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ project_name: newName })
-                })
-            ));
-            
+                });
+            }));
             currentProject = newName;
             document.getElementById('current-project-title').innerText = newName;
             await loadData();
@@ -287,29 +252,21 @@
 
         async function deleteProjectData() {
             if (!confirm(`プロジェクト「${currentProject}」を削除しますか？\n※登録されているアイテムもすべて削除されます。`)) return;
-            
-            showLoader(true, "プロジェクトを削除中...");
+            showLoader(true, "削除中...");
             const projectItems = allData.filter(d => d.project_name === currentProject);
-            
-            // 全アイテムを一括削除
-            await Promise.all(projectItems.map(item => 
-                fetch(`${API_BASE_URL}/items/${item.id}`, { method: "DELETE" })
-            ));
-            
+            await Promise.all(projectItems.map(item => {
+                const itemId = item.id || item._id; // 引用符とIDの揺れ修正
+                return fetch(`${API_BASE_URL}/items/${itemId}`, { method: "DELETE" });
+            }));
             goBackToProjects();
             await loadData();
         }
 
-
-        // --- 製品リスト画面 ---
         function renderItems() {
             const listContainer = document.getElementById('category-list');
             const datalist = document.getElementById('category-datalist');
-            
-            // 初期化用のダミーデータを除外
             const items = allData.filter(d => d.project_name === currentProject && d.category !== "初期化");
             
-            // 合計金額の計算 (決定済みのみ)
             const total = items.filter(i => i.is_decided).reduce((sum, i) => sum + (i.price || 0), 0);
             document.getElementById('total-price').innerText = `¥${total.toLocaleString()}`;
 
@@ -333,11 +290,10 @@
         }
 
         function createItemCard(item) {
-            // 他ユーザーの評価文字列を生成
+            const itemId = item.id || item._id; // 引用符で囲むための変数
             const otherRatings = Object.entries(item.user_ratings || {})
                 .filter(([name, val]) => name !== currentUser)
-                .map(([name, val]) => `${name}:${val}★`)
-                .join(', ');
+                .map(([name, val]) => `${name}:${val}★`).join(', ');
             
             const myRating = (item.user_ratings && item.user_ratings[currentUser]) || 0;
             const imgTag = item.image_data ? `<img src="${item.image_data}" class="w-16 h-16 rounded-lg object-cover border border-gray-200">` : `<div class="w-16 h-16 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-xs text-gray-400">No Img</div>`;
@@ -345,27 +301,24 @@
             
             return `
                 <div class="relative p-3 pt-8 bg-white rounded-xl flex gap-3 items-start border ${item.is_decided ? 'border-indigo-400 bg-indigo-50' : 'border-gray-100'}">
-                    
-                    <!-- 編集・削除ボタン -->
                     <div class="absolute top-2 right-2 flex gap-3">
-                        <button onclick="openEditModal(${item.id})" class="text-gray-400 hover:text-indigo-600 text-xs font-bold">✏️編集</button>
-                        <button onclick="deleteItemRow(${item.id})" class="text-gray-400 hover:text-red-600 text-xs font-bold">🗑️削除</button>
+                        <button onclick="openEditModal('${itemId}')" class="text-gray-400 hover:text-indigo-600 text-xs font-bold">✏️編集</button>
+                        <button onclick="deleteItemRow('${itemId}')" class="text-gray-400 hover:text-red-600 text-xs font-bold">🗑️削除</button>
                     </div>
-
                     <div class="mt-1">
-                        <input type="checkbox" class="w-5 h-5 accent-indigo-600" ${item.is_decided ? 'checked' : ''} onchange="updateItem(${item.id}, {is_decided: this.checked})">
+                        <input type="checkbox" class="w-5 h-5 accent-indigo-600" ${item.is_decided ? 'checked' : ''} onchange="updateItem('${itemId}', {is_decided: this.checked})">
                     </div>
                     ${imgTag}
                     <div class="flex-grow min-w-0">
                         <div class="text-sm font-bold mb-1">${titleLink}</div>
                         <div class="flex items-center gap-2 mb-2">
                             <span class="text-xs text-gray-500">¥</span>
-                            <input type="number" value="${item.price}" onchange="updateItem(${item.id}, {price: parseInt(this.value)||0})" class="w-24 text-sm p-1 border rounded bg-gray-50">
+                            <input type="number" value="${item.price}" onchange="updateItem('${itemId}', {price: parseInt(this.value)||0})" class="w-24 text-sm p-1 border rounded bg-gray-50">
                         </div>
                         <div class="bg-gray-50 p-2 rounded-lg text-xs">
                             <div class="flex justify-between items-center mb-1">
                                 <span class="font-bold text-gray-600">あなたの評価:</span>
-                                <select onchange="updateRating(${item.id}, parseInt(this.value))" class="bg-white border rounded p-1">
+                                <select onchange="updateRating('${itemId}', parseInt(this.value))" class="bg-white border rounded p-1">
                                     ${Object.entries(RATINGS).reverse().map(([k, v]) => `<option value="${k}" ${myRating == k ? 'selected':''}>${v}</option>`).join('')}
                                 </select>
                             </div>
@@ -376,45 +329,38 @@
             `;
         }
 
-        // --- データ追加・更新・AI機能 ---
         async function updateItem(id, payload) {
             await fetch(`${API_BASE_URL}/items/${id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                method: "PUT", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
-            loadData(); // 背景で更新
+            loadData();
         }
 
         async function updateRating(id, val) {
-            const item = allData.find(d => d.id === id);
+            const item = allData.find(d => (d.id === id || d._id === id));
             const newRatings = { ...(item.user_ratings || {}) };
             newRatings[currentUser] = val;
             await updateItem(id, { user_ratings: newRatings });
         }
 
-        // --- アイテム編集・削除機能 ---
         function openEditModal(id) {
-            const item = allData.find(d => d.id === id);
-            document.getElementById('edit-item-id').value = item.id;
+            const item = allData.find(d => (d.id === id || d._id === id));
+            document.getElementById('edit-item-id').value = id;
             document.getElementById('edit-item-title').value = item.title || "";
             document.getElementById('edit-item-price').value = item.price || 0;
             document.getElementById('edit-item-url').value = item.url || "";
             document.getElementById('modal-edit-item').classList.remove('hidden');
         }
 
-        function closeEditModal() {
-            document.getElementById('modal-edit-item').classList.add('hidden');
-        }
+        function closeEditModal() { document.getElementById('modal-edit-item').classList.add('hidden'); }
 
         async function saveEditItem() {
             const id = document.getElementById('edit-item-id').value;
             const title = document.getElementById('edit-item-title').value;
             const price = parseInt(document.getElementById('edit-item-price').value) || 0;
             const url = document.getElementById('edit-item-url').value;
-            
-            closeEditModal();
-            showLoader(true, "更新中...");
+            closeEditModal(); showLoader(true, "更新中...");
             await updateItem(id, { title, price, url });
         }
 
@@ -425,7 +371,6 @@
             loadData();
         }
 
-        // 画像プレビュー圧縮処理
         function handleImage(input) {
             const file = input.files[0];
             if(!file) return;
@@ -434,10 +379,8 @@
                 const img = new Image();
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 400; // 圧縮
-                    const scaleSize = MAX_WIDTH / img.width;
-                    canvas.width = MAX_WIDTH;
-                    canvas.height = img.height * scaleSize;
+                    const scaleSize = 400 / img.width;
+                    canvas.width = 400; canvas.height = img.height * scaleSize;
                     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
                     imageDataBase64 = canvas.toDataURL('image/jpeg', 0.6);
                     document.getElementById('preview-area').classList.remove('hidden');
@@ -448,53 +391,54 @@
             reader.readAsDataURL(file);
         }
 
-        async function autoExtract() {
-            const url = document.getElementById('add-url').value;
-            if(!url) return alert("URLを入力してください");
-            showLoader(true, "AIがサイトを分析中...");
-            try {
-                const res = await fetch(`${API_BASE_URL}/extract?url=${encodeURIComponent(url)}`, { method: "POST" });
-                const data = await res.json();
-                document.getElementById('add-title').value = data.result.title || "";
-                document.getElementById('add-price').value = data.result.price || 0;
-            } catch (e) {
-                alert("取得に失敗しました");
-            }
-            showLoader(false);
-        }
-
         async function addItem() {
             const cat = document.getElementById('add-cat').value;
-            const title = document.getElementById('add-title').value || "無題";
+            let title = document.getElementById('add-title').value;
+            let price = parseInt(document.getElementById('add-price').value) || 0;
+            const url = document.getElementById('add-url').value;
             
             if(!cat) return alert("カテゴリを入力してください");
 
-            showLoader(true, "保存中...");
-            const payload = {
-                project_name: currentProject,
-                category: cat,
-                icon: currentProjIcon,
-                title: title,
-                url: document.getElementById('add-url').value,
-                price: parseInt(document.getElementById('add-price').value) || 0,
-                image_data: imageDataBase64,
-                user_ratings: { [currentUser]: 0 }
-            };
+            // ④ AIで補完するか確認するロジック
+            if (url && (!title || price === 0)) {
+                if (confirm("URLが入力されています。\nAIを使ってサイトから製品名・金額・サムネイルを自動取得しますか？")) {
+                    showLoader(true, "AIがサイトを分析中...");
+                    try {
+                        const res = await fetch(`${API_BASE_URL}/extract?url=${encodeURIComponent(url)}`, { method: "POST" });
+                        const data = await res.json();
+                        if (data && data.result) {
+                            title = data.result.title || title;
+                            price = data.result.price || price;
+                            // ⑤ サムネイル画像のURLが返ってきたらセット
+                            if (data.result.image_url && !imageDataBase64) {
+                                imageDataBase64 = data.result.image_url;
+                            }
+                        }
+                    } catch (e) {
+                        alert("自動取得に失敗しました。このまま登録を進めます。");
+                    }
+                    showLoader(false);
+                }
+            }
 
+            title = title || "無題";
+            showLoader(true, "保存中...");
+            
             await fetch(`${API_BASE_URL}/items`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    project_name: currentProject, category: cat, icon: currentProjIcon,
+                    title: title, url: url, price: price,
+                    image_data: imageDataBase64, user_ratings: { [currentUser]: 0 }
+                })
             });
 
-            // フォームリセット
             document.getElementById('add-url').value = "";
             document.getElementById('add-title').value = "";
             document.getElementById('add-price').value = "";
             document.getElementById('preview-area').classList.add('hidden');
             imageDataBase64 = null;
             document.getElementById('camera-input').value = "";
-
             await loadData();
         }
 
@@ -506,26 +450,24 @@
             showLoader(true, "AIがおすすめ製品を検討中...\n(10秒ほどかかります)");
             try {
                 const res = await fetch(`${API_BASE_URL}/recommend`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    method: "POST", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ category: category, existing_items: existingTitles })
                 });
                 const data = await res.json();
                 
-                // 提案されたものを自動的にDBに登録
+                if (!data.suggestions || data.suggestions.length === 0) {
+                    alert("AIからの提案が取得できませんでした。時間をおいて再試行してください。");
+                    showLoader(false);
+                    return;
+                }
+
                 for (let sugg of data.suggestions) {
                     await fetch(`${API_BASE_URL}/items`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        method: "POST", headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                            project_name: currentProject,
-                            category: category,
-                            icon: currentProjIcon,
-                            title: sugg.title,
-                            url: sugg.url,
-                            price: sugg.price || 0,
-                            comment: sugg.comment,
-                            user_ratings: { [currentUser]: 0 }
+                            project_name: currentProject, category: category, icon: currentProjIcon,
+                            title: sugg.title, url: sugg.url, price: sugg.price || 0,
+                            comment: sugg.comment, user_ratings: { [currentUser]: 0 }
                         })
                     });
                 }
