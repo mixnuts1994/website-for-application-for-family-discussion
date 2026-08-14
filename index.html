@@ -239,7 +239,7 @@
             showLoader(true, "変更中...");
             const projectItems = allData.filter(d => d.project_name === currentProject);
             await Promise.all(projectItems.map(item => {
-                const itemId = item.id || item._id; // IDの形式揺れを吸収
+                const itemId = item.id || item._id;
                 return fetch(`${API_BASE_URL}/items/${itemId}`, {
                     method: "PUT", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ project_name: newName })
@@ -255,7 +255,7 @@
             showLoader(true, "削除中...");
             const projectItems = allData.filter(d => d.project_name === currentProject);
             await Promise.all(projectItems.map(item => {
-                const itemId = item.id || item._id; // 引用符とIDの揺れ修正
+                const itemId = item.id || item._id;
                 return fetch(`${API_BASE_URL}/items/${itemId}`, { method: "DELETE" });
             }));
             goBackToProjects();
@@ -290,7 +290,7 @@
         }
 
         function createItemCard(item) {
-            const itemId = item.id || item._id; // 引用符で囲むための変数
+            const itemId = item.id || item._id;
             const otherRatings = Object.entries(item.user_ratings || {})
                 .filter(([name, val]) => name !== currentUser)
                 .map(([name, val]) => `${name}:${val}★`).join(', ');
@@ -338,14 +338,21 @@
         }
 
         async function updateRating(id, val) {
-            const item = allData.find(d => (d.id === id || d._id === id));
+            // == に修正（文字と数字の揺れを吸収）
+            const item = allData.find(d => (d.id == id || d._id == id));
+            if(!item) return;
             const newRatings = { ...(item.user_ratings || {}) };
             newRatings[currentUser] = val;
             await updateItem(id, { user_ratings: newRatings });
         }
 
         function openEditModal(id) {
-            const item = allData.find(d => (d.id === id || d._id === id));
+            // == に修正（文字と数字の揺れを吸収）
+            const item = allData.find(d => (d.id == id || d._id == id));
+            if(!item) {
+                alert("エラー: アイテムが見つかりません。 (ID: " + id + ")");
+                return;
+            }
             document.getElementById('edit-item-id').value = id;
             document.getElementById('edit-item-title').value = item.title || "";
             document.getElementById('edit-item-price').value = item.price || 0;
@@ -399,23 +406,28 @@
             
             if(!cat) return alert("カテゴリを入力してください");
 
-            // ④ AIで補完するか確認するロジック
             if (url && (!title || price === 0)) {
                 if (confirm("URLが入力されています。\nAIを使ってサイトから製品名・金額・サムネイルを自動取得しますか？")) {
                     showLoader(true, "AIがサイトを分析中...");
                     try {
                         const res = await fetch(`${API_BASE_URL}/extract?url=${encodeURIComponent(url)}`, { method: "POST" });
                         const data = await res.json();
-                        if (data && data.result) {
+                        
+                        console.log("▼ AI取得機能のレスポンスログ:", data); // コンソール用ログ
+                        
+                        // エラーが返ってきた場合のアラート
+                        if (data.error) {
+                            alert("⚠️ AI自動取得エラー: \n" + data.error);
+                        } else if (data && data.result) {
                             title = data.result.title || title;
                             price = data.result.price || price;
-                            // ⑤ サムネイル画像のURLが返ってきたらセット
                             if (data.result.image_url && !imageDataBase64) {
                                 imageDataBase64 = data.result.image_url;
                             }
                         }
                     } catch (e) {
-                        alert("自動取得に失敗しました。このまま登録を進めます。");
+                        console.error("Fetchエラー詳細:", e);
+                        alert("サーバーとの通信に失敗しました。\n開発者ツールのConsoleを確認してください。");
                     }
                     showLoader(false);
                 }
@@ -455,8 +467,16 @@
                 });
                 const data = await res.json();
                 
+                console.log("▼ AI提案機能のレスポンスログ:", data);
+
+                if (data.error) {
+                    alert("⚠️ AI提案エラー: \n" + data.error);
+                    showLoader(false);
+                    return;
+                }
+                
                 if (!data.suggestions || data.suggestions.length === 0) {
-                    alert("AIからの提案が取得できませんでした。時間をおいて再試行してください。");
+                    alert("AIからの提案が空でした。時間をおいて再試行してください。");
                     showLoader(false);
                     return;
                 }
@@ -474,7 +494,8 @@
                 await loadData();
                 alert(`${data.suggestions.length}件のAI提案をリストに追加しました！`);
             } catch(e) {
-                alert("提案の取得に失敗しました。");
+                console.error("Fetchエラー詳細:", e);
+                alert("提案の取得に通信失敗しました。");
             }
             showLoader(false);
         }
