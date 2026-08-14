@@ -5,23 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>検討リスト</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .grid-icons { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+    </style>
 </head>
 <body class="bg-gray-50 min-h-screen pb-10">
     <div class="max-w-md mx-auto p-4" id="app">
-        <!-- 画面の切り替え用 -->
+        <!-- プロジェクト一覧画面 -->
         <div id="screen-project">
-            <h1 class="text-xl font-bold text-gray-800 mb-6 mt-4 text-center">プロジェクトを選択</h1>
+            <h1 class="text-xl font-bold text-gray-800 mb-6 mt-4 text-center">プロジェクト一覧</h1>
             <div id="project-grid" class="grid grid-cols-2 gap-4"></div>
-            <button onclick="showCreateProject()" class="mt-6 w-full p-4 bg-indigo-600 text-white rounded-2xl font-bold">＋ 新規プロジェクト作成</button>
+            
+            <!-- 新規プロジェクト入力エリア -->
+            <div class="mt-8 bg-white p-4 rounded-2xl shadow-sm border border-indigo-100">
+                <h3 class="font-bold mb-2">新規プロジェクト作成</h3>
+                <input type="text" id="new-project-name" placeholder="プロジェクト名を入力" class="w-full p-3 bg-gray-50 rounded-xl mb-3">
+                <div class="flex items-center gap-2 mb-3">
+                    <span id="selected-icon-preview" class="text-3xl p-2 bg-gray-100 rounded-lg">🏠</span>
+                    <button onclick="toggleIconPicker()" class="text-sm text-indigo-600 font-bold underline">アイコンを変更</button>
+                </div>
+                <!-- アイコンピッカー -->
+                <div id="icon-picker" class="hidden mt-2 p-2 bg-gray-50 rounded-xl grid-icons"></div>
+                <button onclick="createNewProject()" class="w-full mt-2 p-3 bg-indigo-600 text-white rounded-xl font-bold">作成</button>
+            </div>
         </div>
 
+        <!-- アイテム一覧画面 -->
         <div id="screen-items" class="hidden">
             <button onclick="goBack()" class="mb-4 text-sm text-gray-500 font-bold">← プロジェクト一覧へ戻る</button>
-            <h2 id="current-project-title" class="text-2xl font-bold mb-4"></h2>
+            <div class="flex items-center gap-3 mb-6">
+                <div id="current-project-icon" class="text-4xl"></div>
+                <h2 id="current-project-title" class="text-2xl font-bold"></h2>
+            </div>
             
-            <!-- アイテム追加フォーム -->
             <div class="bg-white p-4 rounded-2xl shadow-sm mb-6">
-                <input type="text" id="new-category" placeholder="製品カテゴリ名" class="w-full p-3 bg-gray-50 rounded-xl mb-2">
+                <input type="text" id="new-category" placeholder="製品カテゴリ(例: 家電)" class="w-full p-3 bg-gray-50 rounded-xl mb-2">
                 <input type="url" id="new-url" placeholder="URL" class="w-full p-3 bg-gray-50 rounded-xl mb-2">
                 <textarea id="new-comment" placeholder="コメント" class="w-full p-3 bg-gray-50 rounded-xl mb-2 h-20"></textarea>
                 <button onclick="addItem()" class="w-full bg-indigo-600 text-white p-3 rounded-xl font-bold">追加</button>
@@ -30,50 +48,92 @@
         </div>
     </div>
 
-    <!-- 新規作成モーダルなど省略 -->
     <script>
         const API_BASE_URL = "https://application-for-family-discussion.onrender.com/api";
-        const ICONS = ["🏠","🧸","📦","🍽️","💡","🛋️","📚","🎨","🚗","👔","💻","👗","🌱","🍳","🛁","🖼️","🎁","⌚","👟","🏖️","🎉","🚲","🎧","🎒","🧘","🍳","🛏️","🕯️","🧼","🚿","🍽️","🧩","🧴","🔧","🪜","🧺","🛌","🍽️","🍴","🍯","☕","🍵","🍎","🍇","🍓","🌽","🥕","🍞","🥐","🍱","🍣","🍜","🍕","🍔","🍦","🍩","🍰"];
+        const ICONS = ["🏠","🧸","📦","🍽️","💡","🛋️","📚","🎨","🚗","👔","💻","👗","🌱","🍳","🛁","🖼️","🎁","⌚","👟","🏖️","🎉","🚲","🎧","🎒","🧘","🛏️","🕯️","🧼","🚿","🧩","🧴","🔧","🪜","🧺","🛌","🍴","🍯","☕","🍵","🍎","🍇","🍓","🌽","🥕","🍞","🥐","🍱","🍣","🍜","🍕","🍔","🍦","🍩","🍰"];
+        
         let allData = [];
         let currentProject = "";
+        let selectedIcon = "🏠";
 
         async function loadData() {
             const res = await fetch(`${API_BASE_URL}/items`);
             allData = await res.json();
             renderProjects();
+            initIconPicker();
+        }
+
+        // アイコンピッカーの初期化
+        function initIconPicker() {
+            const picker = document.getElementById('icon-picker');
+            picker.innerHTML = ICONS.map(i => `<span onclick="selectIcon('${i}')" class="cursor-pointer text-xl hover:bg-indigo-100 rounded p-1 text-center">${i}</span>`).join('');
+            
+            // まだ使われていないアイコンを提案
+            selectedIcon = getAvailableIcon();
+            document.getElementById('selected-icon-preview').innerText = selectedIcon;
+        }
+
+        function getAvailableIcon() {
+            const usedIcons = [...new Set(allData.map(d => d.icon))];
+            const available = ICONS.filter(i => !usedIcons.includes(i));
+            return available.length > 0 ? available[0] : ICONS[0];
+        }
+
+        function toggleIconPicker() {
+            document.getElementById('icon-picker').classList.toggle('hidden');
+        }
+
+        function selectIcon(i) {
+            selectedIcon = i;
+            document.getElementById('selected-icon-preview').innerText = i;
+            document.getElementById('icon-picker').classList.add('hidden');
         }
 
         function renderProjects() {
             const projectGrid = document.getElementById('project-grid');
-            const projects = [...new Set(allData.map(d => d.project_name))];
+            const projectNames = [...new Set(allData.map(d => d.project_name))];
             
-            projectGrid.innerHTML = projects.map(p => {
+            projectGrid.innerHTML = projectNames.map(p => {
                 const icon = allData.find(d => d.project_name === p).icon;
-                return `<div onclick="selectProject('${p}')" class="bg-white p-6 rounded-3xl shadow-sm border text-center cursor-pointer hover:border-indigo-400">
+                return `<div onclick="selectProject('${p}', '${icon}')" class="bg-white p-6 rounded-3xl shadow-sm border text-center cursor-pointer hover:border-indigo-400 transition-all">
                     <div class="text-4xl mb-2">${icon}</div>
-                    <div class="font-bold text-sm">${p}</div>
+                    <div class="font-bold text-sm truncate">${p}</div>
                 </div>`;
             }).join('');
         }
 
-        function selectProject(p) {
+        function selectProject(p, icon) {
             currentProject = p;
             document.getElementById('screen-project').classList.add('hidden');
             document.getElementById('screen-items').classList.remove('hidden');
             document.getElementById('current-project-title').innerText = p;
+            document.getElementById('current-project-icon').innerText = icon;
             renderItems();
+        }
+
+        async function createNewProject() {
+            const name = document.getElementById('new-project-name').value;
+            if(!name) return alert("名前を入力してください");
+            
+            // 初回ダミーアイテムとして作成（プロジェクトを登録するため）
+            await fetch(`${API_BASE_URL}/items`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ project_name: name, category: "初期化", url: "#", comment: "", icon: selectedIcon })
+            });
+            document.getElementById('new-project-name').value = "";
+            loadData();
         }
 
         function goBack() {
             document.getElementById('screen-project').classList.remove('hidden');
             document.getElementById('screen-items').classList.add('hidden');
-            loadData();
         }
 
         function renderItems() {
             const list = document.getElementById('items-list');
-            const items = allData.filter(d => d.project_name === currentProject);
-            list.innerHTML = items.map(item => `
+            const items = allData.filter(d => d.project_name === currentProject && d.category !== "初期化");
+            list.innerHTML = items.length ? items.map(item => `
                 <div class="bg-white p-4 rounded-2xl flex gap-3 items-center shadow-sm">
                     <img src="${item.image_url || ''}" class="w-16 h-16 rounded-lg bg-gray-100 object-cover">
                     <div class="flex-grow">
@@ -81,22 +141,27 @@
                         <div class="font-bold text-sm line-clamp-1">${item.title}</div>
                     </div>
                 </div>
-            `).join('');
+            `).join('') : '<p class="text-gray-400 text-center py-10">アイテムがまだありません</p>';
         }
 
         async function addItem() {
             const cat = document.getElementById('new-category').value;
             const url = document.getElementById('new-url').value;
             const comment = document.getElementById('new-comment').value;
-            const icon = ICONS[Math.floor(Math.random() * ICONS.length)]; // 簡単のためランダムアイコン
+            
+            // プロジェクトの既存アイコンを継承する
+            const existingIcon = allData.find(d => d.project_name === currentProject).icon;
 
             await fetch(`${API_BASE_URL}/items`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ project_name: currentProject, category: cat, url, comment, icon })
+                body: JSON.stringify({ project_name: currentProject, category: cat, url, comment, icon: existingIcon })
             });
+            document.getElementById('new-category').value = "";
+            document.getElementById('new-url').value = "";
+            document.getElementById('new-comment').value = "";
             await loadData();
-            selectProject(currentProject);
+            renderItems();
         }
 
         window.onload = loadData;
