@@ -3,98 +3,432 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Application Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <title>家族共同検討ツール</title>
+    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
     <style>
-        [x-cloak] { display: none !important; }
+        .grid-icons { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+        /* ローディング画面 */
+        #loader {
+            position: fixed; inset: 0; background: rgba(255,255,255,0.85);
+            display: none; z-index: 100; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5;
+            border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-
-<div x-data="app()" class="max-w-4xl mx-auto p-4">
-    <!-- Screen 1: Name Input -->
-    <div x-show="step === 1" x-cloak class="bg-white p-8 rounded-lg shadow-md">
-        <h1 class="text-2xl font-bold mb-4">ようこそ</h1>
-        <p class="mb-4">お名前を入力してください。</p>
-        <input type="text" x-model="userName" class="border p-2 w-full rounded mb-4" placeholder="名前を入力">
-        <button @click="saveName()" class="bg-blue-600 text-white px-4 py-2 rounded">次へ</button>
+<body class="bg-gray-100 min-h-screen text-gray-800 pb-20">
+    
+    <div id="loader">
+        <div class="spinner mb-4"></div>
+        <p class="font-bold text-gray-600" id="loader-text">読み込み中...</p>
     </div>
 
-    <!-- Screen 2: Project Creation/Selection -->
-    <div x-show="step === 2" x-cloak class="bg-white p-8 rounded-lg shadow-md">
-        <h1 class="text-2xl font-bold mb-4">こんにちは、<span x-text="userName"></span>さん</h1>
-        <h2 class="text-xl mb-4">プロジェクトを選択または作成</h2>
+    <div class="max-w-md mx-auto p-4" id="app">
         
-        <div class="grid grid-cols-5 gap-2 mb-6">
-            <template x-for="icon in icons" :key="icon">
-                <button @click="selectedIcon = icon" 
-                        :class="{'bg-blue-200': selectedIcon === icon}"
-                        class="p-2 border rounded hover:bg-gray-200">
-                    <span x-text="icon"></span>
-                </button>
-            </template>
+        <!-- ========================================== -->
+        <!-- 画面1: 名前入力画面 -->
+        <!-- ========================================== -->
+        <div id="screen-name" class="hidden mt-10">
+            <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-200">
+                <h1 class="text-2xl font-bold mb-6 text-center">お名前を入力してください</h1>
+                <input type="text" id="input-username" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl mb-6 text-lg">
+                <button onclick="saveName()" class="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold text-lg shadow-md hover:bg-indigo-700 transition">次へ</button>
+            </div>
         </div>
 
-        <input type="text" x-model="newProjectName" class="border p-2 w-full rounded mb-4" placeholder="プロジェクト名">
-        <button @click="createProject()" class="bg-green-600 text-white px-4 py-2 rounded mb-6">プロジェクトを作成</button>
-
-        <div class="mt-4">
-            <h3 class="font-bold mb-2">過去のプロジェクト</h3>
-            <template x-for="project in projects" :key="project.id">
-                <div @click="selectProject(project)" class="p-3 border-b cursor-pointer hover:bg-gray-50 flex items-center">
-                    <span class="mr-2" x-text="project.icon"></span> <span x-text="project.name"></span>
+        <!-- ========================================== -->
+        <!-- 画面2: プロジェクト選択・作成画面 -->
+        <!-- ========================================== -->
+        <div id="screen-projects" class="hidden">
+            <div class="flex justify-between items-center mb-6 mt-4">
+                <h1 class="text-xl font-bold">プロジェクト一覧</h1>
+                <button onclick="logout()" class="text-sm text-gray-400 underline">ユーザー切替</button>
+            </div>
+            
+            <div id="project-grid" class="grid grid-cols-2 gap-4 mb-8"></div>
+            
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
+                <h3 class="font-bold mb-3">＋ 新規プロジェクト作成</h3>
+                <input type="text" id="new-project-name" placeholder="プロジェクト名" class="w-full p-3 bg-gray-50 rounded-xl mb-3 border border-gray-200">
+                <div class="flex items-center gap-3 mb-3">
+                    <span id="selected-icon" class="text-3xl p-2 bg-gray-100 rounded-lg">🏠</span>
+                    <button onclick="toggleIconPicker()" class="text-sm text-indigo-600 font-bold underline">アイコンを変更</button>
                 </div>
-            </template>
+                <div id="icon-picker" class="hidden mt-2 mb-4 p-3 bg-gray-50 rounded-xl grid-icons border border-gray-200 h-48 overflow-y-auto"></div>
+                <button onclick="createProject()" class="w-full p-3 bg-indigo-600 text-white rounded-xl font-bold shadow">作成する</button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 画面3: 製品・項目選択画面 -->
+        <!-- ========================================== -->
+        <div id="screen-items" class="hidden">
+            <button onclick="goBackToProjects()" class="mb-4 text-sm text-gray-500 font-bold">← プロジェクト一覧へ戻る</button>
+            
+            <div class="flex justify-between items-end mb-6 bg-white p-4 rounded-2xl shadow-sm border border-gray-200">
+                <div>
+                    <span id="current-project-icon" class="text-2xl mr-2"></span>
+                    <h2 id="current-project-title" class="text-xl font-bold inline"></h2>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs text-gray-500">決定済み合計金額</div>
+                    <div id="total-price" class="text-xl font-bold text-indigo-600">¥0</div>
+                </div>
+            </div>
+
+            <!-- カテゴリ別アイテムリスト -->
+            <div id="category-list" class="space-y-4 mb-8"></div>
+            
+            <!-- アイテム追加フォーム -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 mt-8">
+                <h3 class="font-bold mb-4 border-b pb-2">＋ 製品・項目を追加</h3>
+                
+                <label class="text-xs font-bold text-gray-500">カテゴリ (選択または新規入力)</label>
+                <input type="text" id="add-cat" list="category-datalist" placeholder="例: 家電、家具" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl mb-3">
+                <datalist id="category-datalist"></datalist>
+
+                <label class="text-xs font-bold text-gray-500">参考URL (任意)</label>
+                <div class="flex gap-2 mb-1">
+                    <input type="url" id="add-url" placeholder="https://..." class="flex-grow p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                    <button onclick="autoExtract()" class="bg-indigo-100 text-indigo-700 px-3 rounded-xl font-bold text-xs whitespace-nowrap">AI自動入力</button>
+                </div>
+                
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-xs text-gray-400">または</span>
+                    <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden" onchange="handleImage(this)">
+                    <button onclick="document.getElementById('camera-input').click()" class="text-sm bg-gray-100 px-3 py-1 rounded-lg">📷 カメラで撮影</button>
+                </div>
+                <div id="preview-area" class="mb-3 hidden"><img id="img-preview" class="h-20 rounded"></div>
+
+                <label class="text-xs font-bold text-gray-500">製品名</label>
+                <input type="text" id="add-title" placeholder="製品名" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl mb-3">
+                
+                <label class="text-xs font-bold text-gray-500">金額 (任意)</label>
+                <input type="number" id="add-price" placeholder="0" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl mb-4">
+                
+                <button onclick="addItem()" class="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow">リストに登録</button>
+            </div>
         </div>
     </div>
 
-    <!-- Screen 3: Item/Product Selection -->
-    <div x-show="step === 3" x-cloak class="bg-white p-8 rounded-lg shadow-md">
-        <h1 class="text-2xl font-bold mb-4">製品/項目を選択</h1>
-        <div class="grid grid-cols-2 gap-4">
-            <button class="p-4 border rounded hover:bg-blue-50">製品 A</button>
-            <button class="p-4 border rounded hover:bg-blue-50">製品 B</button>
-            <button class="p-4 border rounded hover:bg-blue-50">項目 X</button>
-            <button class="p-4 border rounded hover:bg-blue-50">項目 Y</button>
-        </div>
-        <button @click="step = 2" class="mt-6 text-gray-600">← 戻る</button>
-    </div>
-</div>
+    <script>
+        // ▼ API URL (ご自身のRender URLに変更してください)
+        const API_BASE_URL = "[https://application-for-family-discussion.onrender.com/api](https://application-for-family-discussion.onrender.com/api)";
+        const ICONS = ["🏠","🧸","📦","🍽️","💡","🛋️","📚","🎨","🚗","👔","💻","👗","🌱","🍳","🛁","🖼️","🎁","⌚","👟","🏖️","🎉","🚲","🎧","🎒","🧘","🛏️","🕯️","🧼","🚿","🧩","🧴","🔧","🪜","🧺","🛌","🍴","🍯","☕","🍵","🍎","🍇","🍓","🌽","🥕","🍞","🥐","🍱","🍣","🍜","🍕","🍔","🍦","🍩","🍰"];
+        const RATINGS = { 5: "5: 決定したい", 4: "4: 有力候補", 3: "3: 検討中", 2: "2: 参考", 1: "1: 微妙", 0: "0: 未評価" };
 
-<script>
-function app() {
-    return {
-        step: 1,
-        userName: '',
-        selectedIcon: '📁',
-        newProjectName: '',
-        projects: [],
-        icons: ['📁', '📂', '📄', '📊', '📅', '📝', '🛠', '⚙️', '💡', '🚀', '🌟', '💻', '📱', '📷', '🎨', '🔥', '💧', '🌿', '🍎', '🚗', '✈️', '🏠', '🏢', '⌚', '🎧', '🎸', '⚽', '🏀', '📚', '🔐', '🎯', '📍', '🌍', '📡', '🔍', '🔋', '🔌', '🖨', '📠', '💿', '💾', '📼', '🎥', '🎭', '🎪', '🎢', '🎡', '🎨', '🧩'],
-        
-        init() {
-            this.userName = localStorage.getItem('userName') || '';
-            if (this.userName) this.step = 2;
-            this.projects = JSON.parse(localStorage.getItem('projects') || '[]');
-        },
-        saveName() {
-            if (!this.userName) return;
-            localStorage.setItem('userName', this.userName);
-            this.step = 2;
-        },
-        createProject() {
-            if (!this.newProjectName) return;
-            const newProj = { id: Date.now(), name: this.newProjectName, icon: this.selectedIcon };
-            this.projects.push(newProj);
-            localStorage.setItem('projects', JSON.stringify(this.projects));
-            this.newProjectName = '';
-            this.selectProject(newProj);
-        },
-        selectProject(project) {
-            this.step = 3;
+        let currentUser = "";
+        let currentProject = "";
+        let currentProjIcon = "";
+        let allData = [];
+        let imageDataBase64 = null;
+        let selectedIcon = "";
+
+        function showLoader(show, text = "読み込み中...") {
+            document.getElementById('loader').style.display = show ? 'flex' : 'none';
+            document.getElementById('loader-text').innerText = text;
         }
-    }
-}
-</script>
+
+        // --- 初期化・ユーザー管理 ---
+        window.onload = () => {
+            currentUser = localStorage.getItem("username");
+            if (currentUser) {
+                document.getElementById('screen-projects').classList.remove('hidden');
+                loadData();
+            } else {
+                document.getElementById('screen-name').classList.remove('hidden');
+            }
+        };
+
+        function saveName() {
+            const name = document.getElementById('input-username').value.trim();
+            if(!name) return alert("名前を入力してください");
+            localStorage.setItem("username", name);
+            currentUser = name;
+            document.getElementById('screen-name').classList.add('hidden');
+            document.getElementById('screen-projects').classList.remove('hidden');
+            loadData();
+        }
+
+        function logout() {
+            localStorage.removeItem("username");
+            location.reload();
+        }
+
+        // --- データ取得・レンダリング ---
+        async function loadData() {
+            showLoader(true);
+            try {
+                const res = await fetch(`${API_BASE_URL}/items`);
+                allData = await res.json();
+                renderProjects();
+                if(currentProject) renderItems(); // プロジェクト選択中なら再描画
+            } catch(e) {
+                console.error(e);
+            }
+            showLoader(false);
+        }
+
+        function renderProjects() {
+            const projectGrid = document.getElementById('project-grid');
+            const projectNames = [...new Set(allData.map(d => d.project_name))];
+            
+            projectGrid.innerHTML = projectNames.map(p => {
+                const item = allData.find(d => d.project_name === p);
+                return `<div onclick="selectProject('${p}', '${item.icon}')" class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 text-center cursor-pointer hover:border-indigo-400 transition-all">
+                    <div class="text-4xl mb-2">${item.icon}</div>
+                    <div class="font-bold text-sm truncate text-gray-700">${p}</div>
+                </div>`;
+            }).join('');
+
+            // アイコンピッカー初期化
+            const picker = document.getElementById('icon-picker');
+            picker.innerHTML = ICONS.map(i => `<span onclick="pickIcon('${i}')" class="cursor-pointer text-2xl hover:bg-indigo-100 rounded p-1 text-center">${i}</span>`).join('');
+            
+            // 未使用アイコンを自動提案
+            const usedIcons = [...new Set(allData.map(d => d.icon))];
+            const available = ICONS.filter(i => !usedIcons.includes(i));
+            selectedIcon = available.length > 0 ? available[0] : ICONS[0];
+            document.getElementById('selected-icon').innerText = selectedIcon;
+        }
+
+        function toggleIconPicker() { document.getElementById('icon-picker').classList.toggle('hidden'); }
+        function pickIcon(i) {
+            selectedIcon = i;
+            document.getElementById('selected-icon').innerText = i;
+            toggleIconPicker();
+        }
+
+        async function createProject() {
+            const name = document.getElementById('new-project-name').value;
+            if(!name) return alert("プロジェクト名を入力してください");
+            
+            showLoader(true, "プロジェクト作成中...");
+            await fetch(`${API_BASE_URL}/items`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ project_name: name, category: "初期化", icon: selectedIcon })
+            });
+            document.getElementById('new-project-name').value = "";
+            await loadData();
+            selectProject(name, selectedIcon);
+        }
+
+        function selectProject(name, icon) {
+            currentProject = name;
+            currentProjIcon = icon;
+            document.getElementById('screen-projects').classList.add('hidden');
+            document.getElementById('screen-items').classList.remove('hidden');
+            document.getElementById('current-project-title').innerText = name;
+            document.getElementById('current-project-icon').innerText = icon;
+            renderItems();
+        }
+
+        function goBackToProjects() {
+            currentProject = "";
+            document.getElementById('screen-items').classList.add('hidden');
+            document.getElementById('screen-projects').classList.remove('hidden');
+        }
+
+        // --- 製品リスト画面 ---
+        function renderItems() {
+            const listContainer = document.getElementById('category-list');
+            const datalist = document.getElementById('category-datalist');
+            
+            // 初期化用のダミーデータを除外
+            const items = allData.filter(d => d.project_name === currentProject && d.category !== "初期化");
+            
+            // 合計金額の計算 (決定済みのみ)
+            const total = items.filter(i => i.is_decided).reduce((sum, i) => sum + (i.price || 0), 0);
+            document.getElementById('total-price').innerText = `¥${total.toLocaleString()}`;
+
+            const categories = [...new Set(items.map(i => i.category))];
+            datalist.innerHTML = categories.map(c => `<option value="${c}">`).join('');
+
+            listContainer.innerHTML = categories.map(cat => {
+                const catItems = items.filter(i => i.category === cat);
+                return `
+                    <details class="group bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden" open>
+                        <summary class="font-bold text-gray-800 p-4 bg-gray-50 cursor-pointer flex justify-between items-center border-b border-gray-100">
+                            <div>${cat} <span class="text-xs font-normal text-gray-500 ml-2">(${catItems.length}件)</span></div>
+                            <button onclick="recommendAI('${cat}')" class="text-xs bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full hover:bg-indigo-200 transition">✨ AIに別候補を提案させる</button>
+                        </summary>
+                        <div class="p-2 space-y-2">
+                            ${catItems.map(item => createItemCard(item)).join('')}
+                        </div>
+                    </details>
+                `;
+            }).join('');
+        }
+
+        function createItemCard(item) {
+            // 他ユーザーの評価文字列を生成
+            const otherRatings = Object.entries(item.user_ratings || {})
+                .filter(([name, val]) => name !== currentUser)
+                .map(([name, val]) => `${name}:${val}★`)
+                .join(', ');
+            
+            const myRating = (item.user_ratings && item.user_ratings[currentUser]) || 0;
+            const imgTag = item.image_data ? `<img src="${item.image_data}" class="w-16 h-16 rounded-lg object-cover border border-gray-200">` : `<div class="w-16 h-16 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-xs text-gray-400">No Img</div>`;
+            const titleLink = item.url ? `<a href="${item.url}" target="_blank" class="text-indigo-600 hover:underline line-clamp-2">${item.title}</a>` : `<span class="line-clamp-2">${item.title}</span>`;
+            
+            return `
+                <div class="p-3 bg-white rounded-xl flex gap-3 items-start border ${item.is_decided ? 'border-indigo-400 bg-indigo-50' : 'border-gray-100'}">
+                    <div class="mt-1">
+                        <input type="checkbox" class="w-5 h-5 accent-indigo-600" ${item.is_decided ? 'checked' : ''} onchange="updateItem(${item.id}, {is_decided: this.checked})">
+                    </div>
+                    ${imgTag}
+                    <div class="flex-grow min-w-0">
+                        <div class="text-sm font-bold mb-1">${titleLink}</div>
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-xs text-gray-500">¥</span>
+                            <input type="number" value="${item.price}" onchange="updateItem(${item.id}, {price: parseInt(this.value)||0})" class="w-24 text-sm p-1 border rounded bg-gray-50">
+                        </div>
+                        <div class="bg-gray-50 p-2 rounded-lg text-xs">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="font-bold text-gray-600">あなたの評価:</span>
+                                <select onchange="updateRating(${item.id}, parseInt(this.value))" class="bg-white border rounded p-1">
+                                    ${Object.entries(RATINGS).reverse().map(([k, v]) => `<option value="${k}" ${myRating == k ? 'selected':''}>${v}</option>`).join('')}
+                                </select>
+                            </div>
+                            ${otherRatings ? `<div class="text-gray-400 mt-1">家族の評価: ${otherRatings}</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- データ追加・更新・AI機能 ---
+        async function updateItem(id, payload) {
+            await fetch(`${API_BASE_URL}/items/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            loadData(); // 背景で更新
+        }
+
+        async function updateRating(id, val) {
+            const item = allData.find(d => d.id === id);
+            const newRatings = { ...(item.user_ratings || {}) };
+            newRatings[currentUser] = val;
+            await updateItem(id, { user_ratings: newRatings });
+        }
+
+        // 画像プレビュー圧縮処理
+        function handleImage(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 400; // 圧縮
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH;
+                    canvas.height = img.height * scaleSize;
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    imageDataBase64 = canvas.toDataURL('image/jpeg', 0.6);
+                    document.getElementById('preview-area').classList.remove('hidden');
+                    document.getElementById('img-preview').src = imageDataBase64;
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function autoExtract() {
+            const url = document.getElementById('add-url').value;
+            if(!url) return alert("URLを入力してください");
+            showLoader(true, "AIがサイトを分析中...");
+            try {
+                const res = await fetch(`${API_BASE_URL}/extract?url=${encodeURIComponent(url)}`, { method: "POST" });
+                const data = await res.json();
+                document.getElementById('add-title').value = data.result.title || "";
+                document.getElementById('add-price').value = data.result.price || 0;
+            } catch (e) {
+                alert("取得に失敗しました");
+            }
+            showLoader(false);
+        }
+
+        async function addItem() {
+            const cat = document.getElementById('add-cat').value;
+            const title = document.getElementById('add-title').value || "無題";
+            
+            if(!cat) return alert("カテゴリを入力してください");
+
+            showLoader(true, "保存中...");
+            const payload = {
+                project_name: currentProject,
+                category: cat,
+                icon: currentProjIcon,
+                title: title,
+                url: document.getElementById('add-url').value,
+                price: parseInt(document.getElementById('add-price').value) || 0,
+                image_data: imageDataBase64,
+                user_ratings: { [currentUser]: 0 }
+            };
+
+            await fetch(`${API_BASE_URL}/items`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            // フォームリセット
+            document.getElementById('add-url').value = "";
+            document.getElementById('add-title').value = "";
+            document.getElementById('add-price').value = "";
+            document.getElementById('preview-area').classList.add('hidden');
+            imageDataBase64 = null;
+            document.getElementById('camera-input').value = "";
+
+            await loadData();
+        }
+
+        async function recommendAI(category) {
+            const items = allData.filter(d => d.project_name === currentProject && d.category === category);
+            const existingTitles = items.map(i => i.title);
+            if(existingTitles.length === 0) return alert("比較元の製品がありません");
+
+            showLoader(true, "AIがおすすめ製品を検討中...\n(10秒ほどかかります)");
+            try {
+                const res = await fetch(`${API_BASE_URL}/recommend`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ category: category, existing_items: existingTitles })
+                });
+                const data = await res.json();
+                
+                // 提案されたものを自動的にDBに登録
+                for (let sugg of data.suggestions) {
+                    await fetch(`${API_BASE_URL}/items`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            project_name: currentProject,
+                            category: category,
+                            icon: currentProjIcon,
+                            title: sugg.title,
+                            url: sugg.url,
+                            price: sugg.price || 0,
+                            comment: sugg.comment,
+                            user_ratings: { [currentUser]: 0 }
+                        })
+                    });
+                }
+                await loadData();
+                alert(`${data.suggestions.length}件のAI提案をリストに追加しました！`);
+            } catch(e) {
+                alert("提案の取得に失敗しました。");
+            }
+            showLoader(false);
+        }
+    </script>
 </body>
 </html>
