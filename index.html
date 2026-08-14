@@ -3,211 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>新居計画アイテム管理</title>
+    <title>家族の検討リスト</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 min-h-screen pb-10">
+<body class="bg-gray-50 min-h-screen pb-10">
 
     <div class="max-w-md mx-auto p-4">
-        <!-- ヘッダー -->
         <header class="text-center mb-6 mt-4">
-            <h1 class="text-2xl font-extrabold text-gray-800">🏡 新居計画アイテム管理</h1>
-            <p class="text-gray-500 text-sm">夫婦で候補をシェアしよう</p>
+            <h1 class="text-2xl font-extrabold text-gray-800">🏡 家族の検討リスト</h1>
         </header>
 
-        <!-- ①プロジェクト選択・作成エリア -->
-        <div class="bg-white p-6 rounded-3xl shadow-lg border border-gray-100 mb-6">
-            <label class="block text-xs font-bold text-gray-400 uppercase mb-1">プロジェクト（場所・カテゴリ）</label>
-            <select id="projectSelect" onchange="handleProjectChange()" class="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-indigo-500 mb-3 font-bold text-gray-700">
-                <!-- JavaScriptで動的に生成されます -->
-            </select>
-            
-            <!-- 新規プロジェクト入力欄（初期は非表示） -->
-            <div id="newProjectDiv" class="hidden mb-3">
-                <input type="text" id="newProjectInput" placeholder="例: 玄関シーリングライト" class="w-full p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-indigo-800 placeholder-indigo-300">
-            </div>
+        <!-- 入力エリア -->
+        <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mb-6">
+            <!-- ①プロジェクト設定 -->
+            <label class="block text-xs font-bold text-gray-400 uppercase mb-1">1. プロジェクト名</label>
+            <select id="projectSelect" onchange="updateCategoryDropdown()" class="w-full p-3 bg-gray-50 rounded-xl mb-3 font-bold"></select>
+            <input type="text" id="newProjectInput" placeholder="新しいプロジェクト名を入力" class="hidden w-full p-3 bg-indigo-50 rounded-xl mb-3 text-indigo-800">
 
-            <div class="border-t border-gray-100 pt-4 mt-2">
-                <!-- ③ URL ＆ コメント入力エリア -->
-                <div class="mb-3">
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">URL</label>
-                    <input type="url" id="url" placeholder="https://..." class="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                </div>
-                <div class="mb-4">
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">コメント・メモ</label>
-                    <textarea id="comment" placeholder="例: 形が可愛い、予算内、要サイズ確認など" class="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-indigo-500 text-sm h-20 resize-none"></textarea>
-                </div>
-                <button id="addBtn" onclick="addItem()" class="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold hover:bg-indigo-700 transition shadow-md">
-                    リストに追加
-                </button>
+            <!-- ②カテゴリ（製品）設定 -->
+            <label class="block text-xs font-bold text-gray-400 uppercase mb-1 mt-2">2. 製品・項目名</label>
+            <select id="categorySelect" class="w-full p-3 bg-gray-50 rounded-xl mb-3 font-bold"></select>
+            <input type="text" id="newCategoryInput" placeholder="新しい製品カテゴリを入力" class="hidden w-full p-3 bg-indigo-50 rounded-xl mb-3 text-indigo-800">
+
+            <div class="border-t pt-4">
+                <input type="url" id="url" placeholder="URL" class="w-full p-3 bg-gray-50 rounded-xl mb-2 text-sm">
+                <textarea id="comment" placeholder="コメント・メモ" class="w-full p-3 bg-gray-50 rounded-xl mb-3 text-sm h-20"></textarea>
+                <button id="addBtn" onclick="addItem()" class="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold">追加する</button>
             </div>
         </div>
 
-        <!-- AIおすすめ機能 -->
-        <button id="aiBtn" onclick="getRecommendation()" class="w-full bg-gradient-to-r from-purple-500 to-indigo-600 text-white p-4 rounded-3xl font-bold mb-6 shadow-lg hover:shadow-xl transition flex justify-center items-center gap-2">
-            ✨ このプロジェクトのAIおすすめを相談
-        </button>
-        <div id="ai-result" class="bg-white p-5 rounded-2xl mb-6 text-sm text-gray-700 hidden shadow-sm border-l-4 border-purple-500 whitespace-pre-wrap"></div>
-
-        <!-- 一覧表示エリア -->
-        <h2 id="listTitle" class="text-sm font-bold text-gray-500 mb-4 px-2 uppercase tracking-wider">登録アイテム一覧</h2>
-        <div id="items-list" class="grid grid-cols-1 gap-4">
-            <!-- 読み込み中 -->
-            <div class="text-center py-10 text-gray-400">読み込み中...</div>
-        </div>
+        <div id="items-list" class="space-y-4"></div>
     </div>
 
     <script>
-        // ★ここをご自身のRenderのURL（末尾に /api を付けたもの）に書き換えてください
         const API_BASE_URL = "https://application-for-family-discussion.onrender.com/api";
-
-        let allItems = [];
+        let allData = [];
 
         window.onload = async () => {
-            await fetchItems();
-        };
-
-        async function fetchItems() {
             try {
                 const res = await fetch(`${API_BASE_URL}/items`);
-                allItems = await res.json();
-                updateProjectDropdown();
-                renderItems();
-            } catch (e) {
-                document.getElementById('items-list').innerHTML = '<div class="text-center py-10 text-red-400">バックエンド起動中またはCORSエラーです。数分待って再読み込みしてください。</div>';
-            }
+                allData = await res.json();
+                renderUI();
+            } catch(e) { document.body.innerHTML = "サーバーエラー: 数分待ってリロードしてください。"; }
+        };
+
+        function renderUI() {
+            const projects = [...new Set(allData.map(d => d.project_name))];
+            const pSelect = document.getElementById('projectSelect');
+            pSelect.innerHTML = `<option value="__new__">＋ 新規プロジェクト</option>` + projects.map(p => `<option value="${p}">${p}</option>`).join('');
+            updateCategoryDropdown();
         }
 
-        // プルダウンの選択肢を構築する
-        function updateProjectDropdown() {
-            const select = document.getElementById('projectSelect');
-            const currentVal = select.value;
-
-            // 既存データからカテゴリを抽出
-            const categories = [...new Set(allItems.map(item => item.category))];
+        function updateCategoryDropdown() {
+            const pVal = document.getElementById('projectSelect').value;
+            const newP = document.getElementById('newProjectInput');
+            newP.classList.toggle('hidden', pVal !== '__new__');
             
-            let html = '';
-            categories.forEach(cat => {
-                html += `<option value="${cat}">${cat}</option>`;
-            });
-            html += `<option value="__new__" class="font-bold text-indigo-600">＋ 新しいプロジェクトを作成する...</option>`;
-            
-            select.innerHTML = html;
-
-            // 以前選択していたものがあれば復元、なければ先頭
-            if (categories.includes(currentVal)) {
-                select.value = currentVal;
-            } else if (categories.length > 0) {
-                select.value = categories[0];
-            }
-            handleProjectChange();
+            const filtered = allData.filter(d => d.project_name === pVal);
+            const cats = [...new Set(filtered.map(d => d.category))];
+            const cSelect = document.getElementById('categorySelect');
+            cSelect.innerHTML = `<option value="__new__">＋ 新しい製品カテゴリ</option>` + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+            updateCategoryInputs();
         }
 
-        // 「新規作成」が選ばれたときの入力欄切り替え
-        function handleProjectChange() {
-            const select = document.getElementById('projectSelect');
-            const newDiv = document.getElementById('newProjectDiv');
-            if (select.value === '__new__' || select.options.length === 1 && select.value === '__new__') {
-                newDiv.classList.remove('hidden');
-            } else {
-                newDiv.classList.add('hidden');
-            }
-            renderItems();
+        function updateCategoryInputs() {
+            const cVal = document.getElementById('categorySelect').value;
+            document.getElementById('newCategoryInput').classList.toggle('hidden', cVal !== '__new__');
         }
 
-        // 現在選択されているプロジェクト名を取得
-        function getSelectedCategory() {
-            const select = document.getElementById('projectSelect');
-            if (select.value === '__new__') {
-                return document.getElementById('newProjectInput').value.trim();
-            }
-            return select.value;
-        }
-
-        // アイテムを描画
-        function renderItems() {
-            const selectedCat = getSelectedCategory();
-            const list = document.getElementById('items-list');
-            
-            // 該当するプロジェクトのアイテムだけに絞り込み
-            const filtered = allItems.filter(item => item.category === selectedCat);
-
-            if (filtered.length === 0) {
-                list.innerHTML = '<div class="bg-white p-6 rounded-2xl text-center text-gray-400 shadow-sm">このプロジェクトにはまだアイテムがありません</div>';
-                return;
-            }
-
-            list.innerHTML = '';
-            filtered.forEach(item => {
-                list.innerHTML += `
-                    <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 flex gap-4 p-4 items-center">
-                        <img src="${item.image_url || 'https://via.placeholder.com/150'}" class="h-20 w-20 rounded-xl object-cover bg-gray-200 flex-shrink-0">
-                        <div class="flex-grow min-w-0">
-                            <p class="text-xs font-bold text-gray-800 truncate">${item.title}</p>
-                            ${item.comment ? `<p class="text-xs text-indigo-600 bg-indigo-50 p-2 rounded-lg mt-1">💬 ${item.comment}</p>` : ''}
-                            <a href="${item.url}" target="_blank" class="inline-block text-[11px] font-bold text-blue-500 hover:underline mt-2">サイトを開く ↗</a>
-                        </div>
-                    </div>
-                `;
-            });
-        }
+        document.getElementById('categorySelect').onchange = updateCategoryInputs;
 
         async function addItem() {
-            const category = getSelectedCategory();
+            const pName = document.getElementById('projectSelect').value === '__new__' ? document.getElementById('newProjectInput').value : document.getElementById('projectSelect').value;
+            const cat = document.getElementById('categorySelect').value === '__new__' ? document.getElementById('newCategoryInput').value : document.getElementById('categorySelect').value;
             const url = document.getElementById('url').value;
             const comment = document.getElementById('comment').value;
 
-            if (!category) return alert("プロジェクト名を入力または選択してください");
-            if (!url) return alert("URLを入力してください");
+            if(!pName || !cat || !url) return alert("全て入力してください");
 
-            const btn = document.getElementById('addBtn');
-            btn.disabled = true;
-            btn.innerText = "登録中...";
-            
             await fetch(`${API_BASE_URL}/items`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ category, url, comment })
+                body: JSON.stringify({ project_name: pName, category: cat, url, comment })
             });
-            
-            document.getElementById('url').value = '';
-            document.getElementById('comment').value = '';
-            document.getElementById('newProjectInput').value = '';
-            
-            btn.disabled = false;
-            btn.innerText = "リストに追加";
-            
-            await fetchItems();
-            // 追加したプロジェクトを選択状態にする
-            document.getElementById('projectSelect').value = category;
-            handleProjectChange();
-        }
-
-        async function getRecommendation() {
-            const category = getSelectedCategory();
-            if (!category || category === '__new__') return alert("有効なプロジェクトを選択してください");
-
-            const btn = document.getElementById('aiBtn');
-            const resultDiv = document.getElementById('ai-result');
-            
-            btn.disabled = true;
-            btn.innerText = "🤔 AIが分析中...";
-            resultDiv.classList.add('hidden');
-
-            try {
-                const res = await fetch(`${API_BASE_URL}/recommend`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ category })
-                });
-                const data = await res.json();
-                resultDiv.innerText = data.recommendation;
-                resultDiv.classList.remove('hidden');
-            } catch(e) {
-                alert("AIの分析に失敗しました");
-            }
-            btn.disabled = false;
-            btn.innerText = "✨ このプロジェクトのAIおすすめを相談";
+            location.reload(); // シンプルにリロードで反映
         }
     </script>
 </body>
